@@ -21,11 +21,11 @@ const (
 )
 
 var (
-	titleRegex  = regexp.MustCompile(`^- \[[\* Xx]*\] *(.*)`)
-	docRegex    = regexp.MustCompile(`^ {2}- (文档|需求):\s*`)
-	reposRegex  = regexp.MustCompile(`^ {2}- (服务|代码仓库|服务列表|服务):\s*`)
-	branchRegex = regexp.MustCompile(`^ {2}- 分支:\s*`)
-	todoRegex   = regexp.MustCompile(`^ {2}- 待办:\s*`)
+	titleRegex  = regexp.MustCompile(`(?i)^- \[[\* Xx]*\] *(.*)`)
+	docRegex    = regexp.MustCompile(`(?i)^ {2}- (文档|需求|doc|docs|documents|documentation|documentations):\s*`)
+	reposRegex  = regexp.MustCompile(`(?i)^ {2}- (服务|代码仓库|服务列表|服务|service|services|repo|repos|repository|repositories):\s*`)
+	branchRegex = regexp.MustCompile(`(?i)^ {2}- (分支|branch|branches):\s*`)
+	todoRegex   = regexp.MustCompile(`(?i)^ {2}- (待办|todo|todos):\s*`)
 	bulletRegex = regexp.MustCompile(`^ {4}- *(.*)`)
 	tildeRegex  = regexp.MustCompile(`(~~.*~~)`)
 )
