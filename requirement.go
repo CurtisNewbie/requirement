@@ -57,7 +57,11 @@ func (r Requirement) String() string {
 	s := ""
 	s += fmt.Sprintf("%v%v%v\n", green, r.Name, reset)
 	if len(r.Docs) > 0 {
-		s += fmt.Sprintf(" Docs: \n    %+v\n", strings.Join(r.Docs, "\n    "))
+		copied := make([]string, len(r.Docs))
+		for i, v := range r.Docs {
+			copied[i] = ParseTilde(v)
+		}
+		s += fmt.Sprintf(" Docs: \n    %+v\n", strings.Join(copied, "\n    "))
 	}
 	if len(r.Repos) > 0 {
 		joined := ""
@@ -79,7 +83,7 @@ func (r Requirement) String() string {
 			if i == r.BranchMatched {
 				joined += redBlink + b + reset
 			} else {
-				joined += b
+				joined += ParseTilde(b)
 			}
 			if i < len(r.Branches)-1 {
 				joined += "\n    "
