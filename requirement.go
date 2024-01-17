@@ -66,11 +66,12 @@ func (r Requirement) String() string {
 	if len(r.Repos) > 0 {
 		joined := ""
 		for i, b := range r.Repos {
-			if i == r.RepoMatched {
-				joined += redBlink + b + reset
-			} else {
-				joined += ParseTilde(b)
-			}
+			// if i == r.RepoMatched {
+			// 	joined += redBlink + b + reset
+			// } else {
+			// joined += ParseTilde(b)
+			// }
+			joined += ParseTilde(b)
 			if i < len(r.Repos)-1 {
 				joined += "\n    "
 			}
@@ -106,8 +107,28 @@ func (r Requirement) String() string {
 	return s
 }
 
-func main() {
+func NewRequirement(name string) Requirement {
+	r := Requirement{}
+	r.Docs = []string{}
+	r.Repos = []string{}
+	r.Branches = []string{}
+	r.Todos = []string{}
+	r.Name = name
+	r.BranchMatched = -1
+	r.RepoMatched = -1
+	return r
+}
 
+func ParseTilde(v string) string {
+	return tildeRegex.ReplaceAllStringFunc(v, func(s string) string {
+		if len(s) < 1 {
+			return s
+		}
+		return dim + s[2:len(s)-2] + reset
+	})
+}
+
+func SearchRequirements() {
 	cmd := exec.Command("git", "status")
 	var cmdout []byte
 	var err error
@@ -250,25 +271,4 @@ func main() {
 	for _, req := range mr {
 		fmt.Printf("%v\n", req)
 	}
-}
-
-func NewRequirement(name string) Requirement {
-	r := Requirement{}
-	r.Docs = []string{}
-	r.Repos = []string{}
-	r.Branches = []string{}
-	r.Todos = []string{}
-	r.Name = name
-	r.BranchMatched = -1
-	r.RepoMatched = -1
-	return r
-}
-
-func ParseTilde(v string) string {
-	return tildeRegex.ReplaceAllStringFunc(v, func(s string) string {
-		if len(s) < 1 {
-			return s
-		}
-		return dim + s[2:len(s)-2] + reset
-	})
 }
