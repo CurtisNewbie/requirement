@@ -1,4 +1,4 @@
-package main
+package requirement
 
 import (
 	"fmt"
@@ -69,7 +69,7 @@ func (r Requirement) String() string {
 			// if i == r.RepoMatched {
 			// 	joined += redBlink + b + reset
 			// } else {
-			// joined += ParseTilde(b)
+			// 	joined += ParseTilde(b)
 			// }
 			joined += ParseTilde(b)
 			if i < len(r.Repos)-1 {
@@ -81,7 +81,7 @@ func (r Requirement) String() string {
 	if len(r.Branches) > 0 {
 		joined := ""
 		for i, b := range r.Branches {
-			if i == r.BranchMatched {
+			if r.RepoMatched > -1 && i == r.BranchMatched {
 				joined += redBlink + b + reset
 			} else {
 				joined += ParseTilde(b)
@@ -242,28 +242,28 @@ func SearchRequirements() {
 	}
 	// fmt.Println(requirements)
 
+	isMain := branch == "master" || branch == "main"
+
 	mr := []Requirement{}
 	for _, req := range requirements {
 		matched := false
-		for i, v := range req.Branches {
-			if branch != "master" && strings.Contains(v, branch) {
-				req.BranchMatched = i
-				mr = append(mr, req)
-				matched = true
-				break
-			}
-		}
-		if matched {
-			continue
-		}
 		for i, v := range req.Repos {
 			if strings.Contains(v, cwd) {
 				req.RepoMatched = i
-				mr = append(mr, req)
 				matched = true
 				break
 			}
 		}
+		if !matched {
+			continue
+		}
+		for i, v := range req.Branches {
+			if !isMain && strings.Contains(v, branch) {
+				req.BranchMatched = i
+				break
+			}
+		}
+		mr = append(mr, req)
 	}
 
 	fmt.Printf("Found %v%v%v Requirements, Matched %v%v%v Requirements\n\n", red, len(requirements), reset, red, len(mr), reset)
