@@ -1,6 +1,7 @@
 package requirement
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,8 @@ var (
 	todoRegex   = regexp.MustCompile(`(?i)^ {2}- (待办|todo|todos):\s*`)
 	bulletRegex = regexp.MustCompile(`^ {4}- *(.*)`)
 	tildeRegex  = regexp.MustCompile(`(~~.*~~)`)
+
+	flagAll = flag.Bool("all", false, "Show all active requirements")
 )
 
 type Requirement struct {
@@ -129,6 +132,8 @@ func ParseTilde(v string) string {
 }
 
 func SearchRequirements() {
+	flag.Parse()
+
 	cmd := exec.Command("git", "status")
 	var cmdout []byte
 	var err error
@@ -244,31 +249,38 @@ func SearchRequirements() {
 
 	isMain := branch == "master" || branch == "main"
 
-	mr := []Requirement{}
-	for _, req := range requirements {
-		matched := false
-		for i, v := range req.Repos {
-			if strings.Contains(v, cwd) {
-				req.RepoMatched = i
-				matched = true
-				break
+	if *flagAll {
+		fmt.Printf("Found %v%v%v Requirements\n\n", red, len(requirements), reset)
+		for _, req := range requirements {
+			fmt.Printf("%v\n", req)
+		}
+	} else {
+		mr := []Requirement{}
+		for _, req := range requirements {
+			matched := false
+			for i, v := range req.Repos {
+				if strings.Contains(v, cwd) {
+					req.RepoMatched = i
+					matched = true
+					break
+				}
 			}
-		}
-		if !matched {
-			continue
-		}
-		for i, v := range req.Branches {
-			if !isMain && strings.Contains(v, branch) {
-				req.BranchMatched = i
-				break
+			if !matched {
+				continue
 			}
+			for i, v := range req.Branches {
+				if !isMain && strings.Contains(v, branch) {
+					req.BranchMatched = i
+					break
+				}
+			}
+			mr = append(mr, req)
 		}
-		mr = append(mr, req)
+
+		fmt.Printf("Found %v%v%v Requirements, Matched %v%v%v Requirements\n\n", red, len(requirements), reset, red, len(mr), reset)
+		for _, req := range mr {
+			fmt.Printf("%v\n", req)
+		}
 	}
 
-	fmt.Printf("Found %v%v%v Requirements, Matched %v%v%v Requirements\n\n", red, len(requirements), reset, red, len(mr), reset)
-
-	for _, req := range mr {
-		fmt.Printf("%v\n", req)
-	}
 }
