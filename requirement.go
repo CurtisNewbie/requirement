@@ -133,41 +133,43 @@ func ParseTilde(v string) string {
 
 func SearchRequirements() {
 	flag.Parse()
+	var branch string
+	var cwd string
 
 	cmd := exec.Command("git", "status")
 	var cmdout []byte
 	var err error
 	if cmdout, err = cmd.CombinedOutput(); err != nil {
-		fmt.Printf("%sNot a git repository, %v%s", red, err, reset)
-		return
-	}
-	outstr := string(cmdout)
-
-	lines := strings.Split(outstr, "\n")
-	if len(lines) < 1 {
-		fmt.Printf("%sNot a git repository%s", red, reset)
-		return
-	}
-
-	l := strings.Index(lines[0], "On branch")
-	branch := ""
-	if l > -1 {
-		branch = string([]rune(lines[0])[l+10:])
-	}
-	fmt.Printf("On Branch %v%v%v\n", red, branch, reset)
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	cwdr := []rune(cwd)
-	for i := len(cwdr) - 1; i >= 0; i-- {
-		if cwdr[i] == '/' {
-			cwd = string(cwdr[i+1:])
-			break
+		fmt.Printf("%sNot a git repository, %v%s\n", red, err, reset)
+	} else {
+		outstr := string(cmdout)
+		lines := strings.Split(outstr, "\n")
+		if len(lines) < 1 {
+			fmt.Printf("%sNot a git repository%s", red, reset)
+			return
+		} else {
+			l := strings.Index(lines[0], "On branch")
+			branch = ""
+			if l > -1 {
+				branch = string([]rune(lines[0])[l+10:])
+			}
 		}
+		fmt.Printf("On Branch %v%v%v\n", red, branch, reset)
+
+		cw, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+		cwd = cw
+		cwdr := []rune(cw)
+		for i := len(cwdr) - 1; i >= 0; i-- {
+			if cwdr[i] == '/' {
+				cwd = string(cwdr[i+1:])
+				break
+			}
+		}
+		fmt.Printf("Current Repo: %v%s%v\n", red, cwd, reset)
 	}
-	fmt.Printf("Current Repo: %v%s%v\n", red, cwd, reset)
 
 	reqFileName := os.Getenv("REQUIREMENTS_FILE")
 	reqFile, err := os.Open(reqFileName)
@@ -249,7 +251,7 @@ func SearchRequirements() {
 
 	isMain := branch == "master" || branch == "main"
 
-	if *flagAll {
+	if *flagAll || (branch == "") {
 		fmt.Printf("Found %v%v%v Requirements\n\n", red, len(requirements), reset)
 		for _, req := range requirements {
 			fmt.Printf("%v\n", req)
