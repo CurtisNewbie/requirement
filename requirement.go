@@ -142,7 +142,7 @@ func SearchRequirements() {
 	if cmdout, err = cmd.CombinedOutput(); err != nil {
 		fmt.Printf("%sNot a git repository, %v%s\n", red, err, reset)
 	} else {
-		outstr := string(cmdout)
+		outstr := UnsafeByt2Str(cmdout)
 		lines := strings.Split(outstr, "\n")
 		if len(lines) < 1 {
 			fmt.Printf("%sNot a git repository%s", red, reset)
@@ -182,7 +182,7 @@ func SearchRequirements() {
 		panic(err)
 	}
 
-	content := string(byt)
+	content := UnsafeByt2Str(byt)
 	i := strings.Index(content, "## Active Requirements")
 	if i > 0 {
 		for j := i; j < len(content); j++ {
