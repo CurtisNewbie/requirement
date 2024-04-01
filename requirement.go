@@ -183,6 +183,18 @@ func SearchRequirements() {
 	}
 
 	content := string(byt)
+	i := strings.Index(content, "## Active Requirements")
+	if i > 0 {
+		for j := i; j < len(content); j++ {
+			if content[j] == '\n' {
+				if j+1 < len(content) {
+					j = j + 1
+				}
+				content = content[j+1:]
+				break
+			}
+		}
+	}
 
 	splited := strings.Split(content, "\n")
 	if len(splited) < 1 {
@@ -192,12 +204,6 @@ func SearchRequirements() {
 	requirements := []Requirement{}
 
 	start := 0
-	for i, l := range splited {
-		if strings.TrimSpace(l) == "## Active Requirements" {
-			start = i
-			break
-		}
-	}
 
 	for i := start; i < len(splited); i++ {
 		l := splited[i]
