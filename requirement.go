@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	titleRegex  = regexp.MustCompile(`(?i)^- \[[\* Xx]*\] *(.*)`)
+	titleRegex  = regexp.MustCompile(`(?i)^- \[([\* Xx]*)\] *(.*)`)
 	docRegex    = regexp.MustCompile(`(?i)^ {2}- (文档|需求|doc|docs|documents|documentation|documentations):\s*`)
 	reposRegex  = regexp.MustCompile(`(?i)^ {2}- (服务|代码仓库|服务列表|服务|service|services|repo|repos|repository|repositories):\s*`)
 	branchRegex = regexp.MustCompile(`(?i)^ {2}- (分支|branch|branches):\s*`)
@@ -34,6 +34,7 @@ var (
 )
 
 type Requirement struct {
+	Done     bool
 	Name     string
 	Docs     []string
 	Repos    []string
@@ -213,7 +214,10 @@ func SearchRequirements() {
 		}
 
 		if matched := titleRegex.FindStringSubmatch(l); len(matched) > 0 {
-			curr := NewRequirement(matched[1])
+			curr := NewRequirement(matched[2])
+			if strings.TrimSpace(matched[1]) != "" {
+				curr.Done = true
+			}
 			requirements = append(requirements, curr)
 		} else {
 			if len(requirements) < 1 {
@@ -256,6 +260,7 @@ func SearchRequirements() {
 	// fmt.Println(requirements)
 
 	isMain := branch == "master" || branch == "main"
+	requirements = Filter(requirements, func(r Requirement) bool { return !r.Done })
 
 	if *flagAll || (branch == "") {
 		fmt.Printf("Found %v%v%v Requirements\n\n", red, len(requirements), reset)
@@ -291,4 +296,19 @@ func SearchRequirements() {
 		}
 	}
 
+}
+
+func Filter[T any](l []T, f func(T) bool) []T {
+	cp := l[:0]
+	for i := range l {
+		x := l[i]
+		if f(x) {
+			cp = append(cp, x)
+		}
+	}
+	for i := len(cp); i < len(l); i++ {
+		var nt T
+		l[i] = nt
+	}
+	return cp
 }
