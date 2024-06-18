@@ -202,7 +202,7 @@ func SearchRequirements() {
 		fmt.Printf("%sRequirement not found%s", red, reset)
 	}
 
-	requirements := []Requirement{}
+	requirements := make([]Requirement, 0, 30)
 
 	start := 0
 
