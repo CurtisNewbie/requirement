@@ -4,7 +4,7 @@ Simple tool to manage requirements.
 
 ### The Requirement Template
 
-```md
+~~~md
 - [ ] Requirement ID972612 optimize speed
   - Doc:
     - Technical Doc: https://my/technical/design/miso/ID972612
@@ -22,7 +22,14 @@ Simple tool to manage requirements.
     - [x] maintain sql scripts
     - [ ] maintain nacos configuration
     - [ ] maintain release notes
+
 ```
+# scripts for the requirement above
+
+curl -X POST ....
+INSERT INTO .....
+```
+~~~
 
 ### Configure Requirment File Location
 
