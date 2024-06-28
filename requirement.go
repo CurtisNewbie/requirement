@@ -34,12 +34,13 @@ var (
 )
 
 type Requirement struct {
-	Done     bool
-	Name     string
-	Docs     []string
-	Repos    []string
-	Branches []string
-	Todos    []string
+	Done       bool
+	Name       string
+	Docs       []string
+	Repos      []string
+	Branches   []string
+	Todos      []string
+	CodeBlocks []string
 
 	InDoc      bool
 	InRepos    bool
@@ -57,6 +58,20 @@ func (r *Requirement) ResetFlags() {
 	r.InTodos = false
 }
 
+func (r Requirement) AddCodeBlock(s string) Requirement {
+	s = strings.TrimSpace(s)
+	i := strings.Index(s, "\n")
+	if i > -1 {
+		s = s[i+1:]
+	}
+	s, _ = strings.CutSuffix(s, "```")
+	sp := strings.Split(s, "\n")
+	s = "  " + strings.Join(sp, "\n  ")
+
+	r.CodeBlocks = append(r.CodeBlocks, s)
+	return r
+}
+
 func (r Requirement) String() string {
 	s := ""
 	s += fmt.Sprintf("%v%v%v\n", green, r.Name, reset)
@@ -70,11 +85,6 @@ func (r Requirement) String() string {
 	if len(r.Repos) > 0 {
 		joined := ""
 		for i, b := range r.Repos {
-			// if i == r.RepoMatched {
-			// 	joined += redBlink + b + reset
-			// } else {
-			// 	joined += ParseTilde(b)
-			// }
 			joined += ParseTilde(b)
 			if i < len(r.Repos)-1 {
 				joined += "\n    "
@@ -107,7 +117,13 @@ func (r Requirement) String() string {
 		}
 		s += fmt.Sprintf(" Todos: \n    %+v\n", strings.Join(copied, "\n    "))
 	}
-	// s += fmt.Sprintf(" Flags: InDoc:%v, InRepos: %v, InTodos: %v, InBranches: %v\n", r.InDoc, r.InRepos, r.InTodos, r.InBranches)
+	if len(r.CodeBlocks) > 0 {
+		copied := make([]string, len(r.CodeBlocks))
+		for i, v := range r.CodeBlocks {
+			copied[i] = cyan + v + reset
+		}
+		s += fmt.Sprintf(" Code Blocks: \n\n%+v\n", strings.Join(copied, "\n\n"))
+	}
 	return s
 }
 
@@ -120,6 +136,7 @@ func NewRequirement(name string) Requirement {
 	r.Name = name
 	r.BranchMatched = -1
 	r.RepoMatched = -1
+	r.CodeBlocks = []string{}
 	return r
 }
 
@@ -201,15 +218,31 @@ func ParseRequirements() {
 	if len(splited) < 1 {
 		fmt.Printf("%sRequirement not found%s", red, reset)
 	}
-
 	requirements := make([]Requirement, 0, 30)
+	codeBlock := "```"
 
 	start := 0
 
 	for i := start; i < len(splited); i++ {
 		l := splited[i]
 
-		if strings.HasPrefix(l, "#") || strings.HasPrefix(l, "```") || strings.TrimSpace(l) == "" {
+		if strings.HasPrefix(l, "#") || strings.TrimSpace(l) == "" {
+			continue
+		}
+		if strings.HasPrefix(l, codeBlock) {
+			j := i + 1
+			for ; j < len(splited) && !strings.HasPrefix(splited[j], codeBlock); j++ {
+			}
+			if j == i || j >= len(splited) {
+				continue
+			}
+			l = strings.Join(splited[i:j+1], "\n")
+
+			if len(requirements) < 1 {
+				panic(fmt.Errorf("illegal format, line: %v", l))
+			}
+			requirements[len(requirements)-1] = requirements[len(requirements)-1].AddCodeBlock(l)
+			i = j + 1
 			continue
 		}
 
