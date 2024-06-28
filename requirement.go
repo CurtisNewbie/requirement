@@ -72,6 +72,22 @@ func (r Requirement) AddCodeBlock(s string) Requirement {
 	return r
 }
 
+var bracketPat = regexp.MustCompile(`[【】]`)
+
+func (r Requirement) SetName(s string) Requirement {
+	r.Name = bracketPat.ReplaceAllStringFunc(s, func(s string) string {
+		switch s {
+		case "【":
+			return "["
+		case "】":
+			return "]"
+		default:
+			return s
+		}
+	})
+	return r
+}
+
 func (r Requirement) String() string {
 	s := ""
 	s += fmt.Sprintf("%v%v%v\n", green, r.Name, reset)
@@ -129,11 +145,11 @@ func (r Requirement) String() string {
 
 func NewRequirement(name string) Requirement {
 	r := Requirement{}
+	r = r.SetName(name)
 	r.Docs = []string{}
 	r.Repos = []string{}
 	r.Branches = []string{}
 	r.Todos = []string{}
-	r.Name = name
 	r.BranchMatched = -1
 	r.RepoMatched = -1
 	r.CodeBlocks = []string{}
