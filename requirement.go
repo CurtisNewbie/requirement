@@ -132,7 +132,7 @@ func ParseTilde(v string) string {
 	})
 }
 
-func SearchRequirements() {
+func ParseRequirements() {
 	flag.Parse()
 	var branch string
 	var cwd string
