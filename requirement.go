@@ -87,7 +87,7 @@ func (r *Requirement) SetName(s string) {
 		case "【":
 			return "["
 		case "】":
-			return "]"
+			return "] "
 		default:
 			return s
 		}
