@@ -1,4 +1,4 @@
-package requirement
+package main
 
 import (
 	"flag"
@@ -37,9 +37,187 @@ var (
 	todoRegex   = regexp.MustCompile(`(?i)^ {2}- (待办|todo|todos):\s*`)
 	bulletRegex = regexp.MustCompile(`^ {4}- *(.*)`)
 	tildeRegex  = regexp.MustCompile(`(~~.*~~)`)
-
-	flagAll = flag.Bool("all", false, "Show all active requirements")
 )
+
+var (
+	All  = flag.Bool("all", false, "Show all active requirements")
+	New  = flag.Bool("new", false, "Add new requirement")
+	Name = flag.String("name", "", "New requirement name")
+	// Archive = flag.String("archive", "", "Archive requirement by name")
+)
+
+func main() {
+	flag.Parse()
+
+	branch, cwd := ParseCurrRepo()
+	file := os.Getenv(EnvRequirementFile)
+
+	if util.IsBlankStr(file) {
+		util.Printlnf("Where is the requirement file?")
+		return
+	}
+
+	if *New {
+		af, err := util.AppendableFile(file)
+		util.Must(err)
+		defer af.Close()
+		name := *Name
+		if util.IsBlankStr(name) {
+			name = "TODO"
+		}
+		af.WriteString(util.NamedSprintf(`
+- [ ] ${name}
+  - 文档:
+    - 记录时间: ${today}
+    - 需求地址:
+    - 技术文档:
+    - 需求文档:
+    - 发布单:
+    - UI:
+  - 服务:
+    - ${repo}
+  - 分支:
+    - ${branch}
+  - 待办:
+    - [ ]
+  `, map[string]any{
+			"name":   name,
+			"today":  util.Now().FormatDate(),
+			"repo":   cwd,
+			"branch": branch,
+		}))
+		return
+	}
+
+	byt, err := util.ReadFileAll(file)
+	util.Must(err)
+
+	content := util.UnsafeByt2Str(byt)
+	i := strings.Index(content, "## Active Requirements")
+	if i > 0 {
+		for j := i; j < len(content); j++ {
+			if content[j] == '\n' {
+				if j+1 < len(content) {
+					j = j + 1
+				}
+				content = content[j+1:]
+				break
+			}
+		}
+	}
+
+	splited := strings.Split(content, "\n")
+	if len(splited) < 1 {
+		fmt.Printf("%sRequirement not found%s", red, reset)
+	}
+	requirements := util.NewStack[*Requirement](30)
+
+	for i := 0; i < len(splited); i++ {
+		l := splited[i]
+
+		if strings.HasPrefix(l, "#") || strings.TrimSpace(l) == "" {
+			continue
+		}
+		if strings.HasPrefix(l, codeBlock) {
+			j := i + 1
+			for ; j < len(splited) && !strings.HasPrefix(splited[j], codeBlock); j++ {
+			}
+			if j == i || j >= len(splited) {
+				continue
+			}
+			l = strings.Join(splited[i:j+1], "\n")
+
+			curr, ok := requirements.Peek()
+			if !ok {
+				panic(fmt.Errorf("illegal format, line: %v", l))
+			}
+			curr.AddCodeBlock(l)
+			i = j + 1
+			continue
+		}
+
+		if matched := titleRegex.FindStringSubmatch(l); len(matched) > 0 {
+			curr := NewRequirement(matched[2])
+			if strings.TrimSpace(matched[1]) != "" {
+				curr.Done = true
+			}
+			requirements.Push(curr)
+		} else {
+			curr, ok := requirements.Peek()
+			if !ok {
+				panic(fmt.Errorf("illegal format, line: %v", l))
+			}
+
+			if matched := docRegex.FindStringSubmatch(l); len(matched) > 0 {
+				curr.ResetFlags()
+				curr.InDoc = true
+			} else if matched := reposRegex.FindStringSubmatch(l); len(matched) > 0 {
+				curr.ResetFlags()
+				curr.InRepos = true
+			} else if matched := todoRegex.FindStringSubmatch(l); len(matched) > 0 {
+				curr.ResetFlags()
+				curr.InTodos = true
+			} else if matched := branchRegex.FindStringSubmatch(l); len(matched) > 0 {
+				curr.ResetFlags()
+				curr.InBranches = true
+			} else if matched := bulletRegex.FindStringSubmatch(l); len(matched) > 0 {
+				line := matched[1]
+				if strings.TrimSpace(line) != "" {
+					if curr.InDoc {
+						tokens := strings.Split(line, ":")
+						if len(tokens) > 1 && strings.TrimSpace(strings.Join(tokens[1:], "")) != "" {
+							curr.Docs = append(curr.Docs, line)
+						}
+					} else if curr.InRepos {
+						curr.Repos = append(curr.Repos, line)
+					} else if curr.InTodos {
+						curr.Todos = append(curr.Todos, line)
+					} else if curr.InBranches {
+						curr.Branches = append(curr.Branches, line)
+					}
+				}
+			}
+		}
+	}
+
+	isMain := branch == "master" || branch == "main"
+	filtered := util.Filter(requirements.Slice(), func(r *Requirement) bool { return !r.Done })
+
+	if *All || (branch == "") {
+		util.Printlnf("Found %v%v%v Requirements\n", red, len(filtered), reset)
+		for _, req := range filtered {
+			util.Printlnf("%v", req)
+		}
+	} else {
+		mr := make([]*Requirement, 0, len(filtered))
+		for _, req := range filtered {
+			matched := false
+			for i, v := range req.Repos {
+				if strings.Contains(v, cwd) {
+					req.RepoMatched = i
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+			for i, v := range req.Branches {
+				if !isMain && strings.Contains(v, branch) {
+					req.BranchMatched = i
+					break
+				}
+			}
+			mr = append(mr, req)
+		}
+
+		util.Printlnf("Found %v%v%v Requirements, Matched %v%v%v Requirements\n",
+			red, len(filtered), reset, red, len(mr), reset)
+		for _, req := range mr {
+			util.Printlnf(req.String())
+		}
+	}
+}
 
 type Requirement struct {
 	Done       bool
@@ -171,11 +349,7 @@ func ParseTilde(v string) string {
 	})
 }
 
-func ParseRequirements() {
-	flag.Parse()
-	var branch string
-	var cwd string
-
+func ParseCurrRepo() (branch string, cwd string) {
 	cmdout, err := util.CliRun("git", "status")
 	if err != nil {
 		util.Printlnf("%sNot a git repository, %v%s", red, err, reset)
@@ -208,135 +382,5 @@ func ParseRequirements() {
 		}
 		util.Printlnf("Current Repo: %v%s%v", red, cwd, reset)
 	}
-
-	byt, err := util.ReadFileAll(os.Getenv(EnvRequirementFile))
-	if err != nil {
-		panic(err)
-	}
-
-	content := util.UnsafeByt2Str(byt)
-	i := strings.Index(content, "## Active Requirements")
-	if i > 0 {
-		for j := i; j < len(content); j++ {
-			if content[j] == '\n' {
-				if j+1 < len(content) {
-					j = j + 1
-				}
-				content = content[j+1:]
-				break
-			}
-		}
-	}
-
-	splited := strings.Split(content, "\n")
-	if len(splited) < 1 {
-		fmt.Printf("%sRequirement not found%s", red, reset)
-	}
-	requirements := util.NewStack[*Requirement](30)
-
-	for i := 0; i < len(splited); i++ {
-		l := splited[i]
-
-		if strings.HasPrefix(l, "#") || strings.TrimSpace(l) == "" {
-			continue
-		}
-		if strings.HasPrefix(l, codeBlock) {
-			j := i + 1
-			for ; j < len(splited) && !strings.HasPrefix(splited[j], codeBlock); j++ {
-			}
-			if j == i || j >= len(splited) {
-				continue
-			}
-			l = strings.Join(splited[i:j+1], "\n")
-
-			curr, ok := requirements.Peek()
-			if !ok {
-				panic(fmt.Errorf("illegal format, line: %v", l))
-			}
-			curr.AddCodeBlock(l)
-			i = j + 1
-			continue
-		}
-
-		if matched := titleRegex.FindStringSubmatch(l); len(matched) > 0 {
-			curr := NewRequirement(matched[2])
-			if strings.TrimSpace(matched[1]) != "" {
-				curr.Done = true
-			}
-			requirements.Push(curr)
-		} else {
-			curr, ok := requirements.Peek()
-			if !ok {
-				panic(fmt.Errorf("illegal format, line: %v", l))
-			}
-
-			if matched := docRegex.FindStringSubmatch(l); len(matched) > 0 {
-				curr.ResetFlags()
-				curr.InDoc = true
-			} else if matched := reposRegex.FindStringSubmatch(l); len(matched) > 0 {
-				curr.ResetFlags()
-				curr.InRepos = true
-			} else if matched := todoRegex.FindStringSubmatch(l); len(matched) > 0 {
-				curr.ResetFlags()
-				curr.InTodos = true
-			} else if matched := branchRegex.FindStringSubmatch(l); len(matched) > 0 {
-				curr.ResetFlags()
-				curr.InBranches = true
-			} else if matched := bulletRegex.FindStringSubmatch(l); len(matched) > 0 {
-				line := matched[1]
-				if strings.TrimSpace(line) != "" {
-					if curr.InDoc {
-						tokens := strings.Split(line, ":")
-						if len(tokens) > 1 && strings.TrimSpace(strings.Join(tokens[1:], "")) != "" {
-							curr.Docs = append(curr.Docs, line)
-						}
-					} else if curr.InRepos {
-						curr.Repos = append(curr.Repos, line)
-					} else if curr.InTodos {
-						curr.Todos = append(curr.Todos, line)
-					} else if curr.InBranches {
-						curr.Branches = append(curr.Branches, line)
-					}
-				}
-			}
-		}
-	}
-
-	isMain := branch == "master" || branch == "main"
-	filtered := util.Filter(requirements.Slice(), func(r *Requirement) bool { return !r.Done })
-
-	if *flagAll || (branch == "") {
-		util.Printlnf("Found %v%v%v Requirements\n", red, len(filtered), reset)
-		for _, req := range filtered {
-			util.Printlnf("%v", req)
-		}
-	} else {
-		mr := make([]*Requirement, 0, len(filtered))
-		for _, req := range filtered {
-			matched := false
-			for i, v := range req.Repos {
-				if strings.Contains(v, cwd) {
-					req.RepoMatched = i
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-			for i, v := range req.Branches {
-				if !isMain && strings.Contains(v, branch) {
-					req.BranchMatched = i
-					break
-				}
-			}
-			mr = append(mr, req)
-		}
-
-		util.Printlnf("Found %v%v%v Requirements, Matched %v%v%v Requirements\n", red, len(filtered), reset, red, len(mr), reset)
-		for _, req := range mr {
-			util.Printlnf("%v", req)
-		}
-	}
-
+	return
 }
